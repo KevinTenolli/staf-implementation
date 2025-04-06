@@ -1,10 +1,10 @@
 #include <iostream>
+#include <map>
 #include <omp.h>
 #include <ostream>
+#include <sstream>
 #include <torch/extension.h>
 #include <vector>
-#include <map>
-#include <sstream>
 
 #define CHECK_DTYPE(x, dtype)                                                  \
   TORCH_CHECK(x.scalar_type() == dtype,                                        \
@@ -17,10 +17,9 @@ private:
   std::set<int> row_numbers; // practically the leaves of the trie
 
 public:
-  trie_node() : index(-1) {} // root node
+  trie_node() : index(-1) {}         // root node
   trie_node(int idx) : index(idx) {} // node
 
-  // if node child exists, return it, else add it
   trie_node *add_child(int idx) {
     for (auto &child : children) {
       if (child->index == idx)
@@ -30,7 +29,6 @@ public:
     return children.back().get();
   }
 
-  //get child with the specific index if it exists
   trie_node *get_child(int idx) const {
     for (auto &child : children) {
       if (child->index == idx)
@@ -39,28 +37,96 @@ public:
     return nullptr;
   }
 
-  //check if child exists
   bool has_child(int idx) const { return get_child(idx) != nullptr; }
-  //add a row number to a node
   void add_row_number(int row_num) { row_numbers.insert(row_num); }
-  //get row numbers for a node
   const std::set<int> &get_row_numbers() const { return row_numbers; }
-  //get children
   const std::vector<std::unique_ptr<trie_node>> &get_children() const {
     return children;
   }
-  //return the column index for the node
   int get_index() const { return index; }
-
-  // Check if node is shared by multiple rows
-  bool is_shared() const { return row_numbers.size() > 1; }
+  bool is_shared() const {
+    if (children.size() >= 2 || row_numbers.size() >= 2 ||
+        (children.size() >= 1 && row_numbers.size() >= 1)) {
+      return true;
+    }
+    return false;
+  }
 };
 
 class suffix_trie {
 private:
   std::unique_ptr<trie_node> root;
+  size_t vector_size;
 
-  //utility function to print the nodes
+  std::set<int> build_patterns_bottom_up(
+      const trie_node *node,
+      std::map<std::vector<int>, std::vector<float>> &patterns) const {
+    std::set<int> current_rows = node->get_row_numbers();
+    bool is_shared = node->is_shared();
+    bool is_leaf = node->get_children().empty();
+
+    // Process children first (post-order traversal)
+    for (const auto &child : node->get_children()) {
+      std::set<int> child_rows =
+          build_patterns_bottom_up(child.get(), patterns);
+      current_rows.insert(child_rows.begin(), child_rows.end());
+    }
+
+    if (is_shared || (is_leaf && current_rows.size() > 1)) {
+      std::vector<float> current_pattern = {};
+      if (node->get_index() >= 0) {
+        current_pattern[node->get_index()] = 1.0f;
+      }
+      // Only store if actually shared by multiple rows
+      std::vector<int> key(current_rows.begin(), current_rows.end());
+      patterns[key] = current_pattern;
+    } else if (current_rows.size() > 1) {
+      std::vector<int> key(current_rows.begin(), current_rows.end());
+      auto it = patterns.find(key);
+      if (it != patterns.end()) {
+        // Pattern exists - modify it
+        if (node->get_index() >= 0) {
+          it->second[node->get_index()] = 1.0f; // Add 1.0 at current index
+        }
+      }
+    }
+    return current_rows;
+  }
+
+  std::set<int> build_patterns_bottom_up_unique(
+      const trie_node *node,
+      std::map<std::vector<int>, std::vector<float>> &patterns) const {
+    std::set<int> current_rows = node->get_row_numbers();
+    bool is_shared = node->is_shared();
+    bool is_leaf = node->get_children().empty();
+
+    // Process children first (post-order traversal)
+    for (const auto &child : node->get_children()) {
+      std::set<int> child_rows =
+          build_patterns_bottom_up(child.get(), patterns);
+      current_rows.insert(child_rows.begin(), child_rows.end());
+    }
+
+    if (is_shared || (is_leaf && current_rows.size() > 1)) {
+      return current_rows;
+    }
+    if (current_rows.size() == 1) {
+      std::vector<int> key(current_rows.begin(), current_rows.end());
+      auto it = patterns.find(key);
+      if (it != patterns.end()) {
+        // Pattern exists - modify it
+        if (node->get_index() >= 0) {
+          it->second[node->get_index()] = 1.0f; // Add 1.0 at current index
+        }
+      }
+    }
+    return current_rows;
+  }
+
+public:
+  suffix_trie(size_t size)
+      : root(std::make_unique<trie_node>()), vector_size(size) {}
+  // utility function to print the nodes
   void print_node(const trie_node *node, const std::string &prefix,
                   bool is_last) const {
     std::cout << prefix << (is_last ? "└── " : "├── ");
@@ -83,19 +149,6 @@ private:
     }
   }
 
-public:
-  suffix_trie() : root(std::make_unique<trie_node>()) {}
-
-  void add_matrix_row(const std::vector<float> &row, int row_num) {
-    auto *node = root.get();
-    for (int i = row.size() - 1; i >= 0; --i) {
-      if (row[i] != 0) {
-        node = node->has_child(i) ? node->get_child(i) : node->add_child(i);
-        node->add_row_number(row_num); // Add row number to each node in the path
-      }
-    }
-  }
-
   void print_trie() {
     if (!root) {
       std::cout << "Trie is empty" << std::endl;
@@ -104,10 +157,67 @@ public:
     std::cout << "Suffix Trie Structure:" << std::endl;
     print_node(root.get(), "", true);
   }
+  void add_matrix_row(const std::vector<float> &row, int row_num) {
+    auto *node = root.get();
+    bool is_last_non_zero = false;
+    for (int i = row.size() - 1; i >= 0; --i) {
+      if (row[i] != 0) {
+        node = node->has_child(i) ? node->get_child(i) : node->add_child(i);
+        if (i == 0 || row[i - 1] == 0) {
+          is_last_non_zero = true;
+        }
 
-    void traverse_paths() {
-        auto *node = root.get();
+        // If this is the last non-zero element, add the row number to the node
+        if (is_last_non_zero) {
+          node->add_row_number(row_num);
+        }
+      }
     }
+  }
+
+  std::map<std::vector<int>, std::vector<float>> get_shared_patterns() const {
+    std::map<std::vector<int>, std::vector<float>> patterns;
+    build_patterns_bottom_up(root.get(), patterns);
+    std::cout << "ssssPatterns Map:\n";
+
+    for (const auto &pair : patterns) {
+      // Print the key (std::vector<int>)
+      std::cout << "Key: [ ";
+      for (int num : pair.first) {
+        std::cout << num << " ";
+      }
+      std::cout << "] -> Values: [ ";
+
+      // Print the value (std::vector<float>)
+      for (float num : pair.second) {
+        std::cout << num << " ";
+      }
+      std::cout << "]\n";
+    }
+    return patterns;
+  }
+
+  std::map<std::vector<int>, std::vector<float>> get_unique_patterns() const {
+    std::map<std::vector<int>, std::vector<float>> patterns;
+    build_patterns_bottom_up_unique(root.get(), patterns);
+    std::cout << "unique Patterns Map:\n";
+
+    for (const auto &pair : patterns) {
+      // Print the key (std::vector<int>)
+      std::cout << "Key: [ ";
+      for (int num : pair.first) {
+        std::cout << num << " ";
+      }
+      std::cout << "] -> Values: [ ";
+
+      // Print the value (std::vector<float>)
+      for (float num : pair.second) {
+        std::cout << num << " ";
+      }
+      std::cout << "]\n";
+    }
+    return patterns;
+  }
 };
 
 std::vector<std::vector<float>> create_matrix(int32_t *array_of_rows,
@@ -115,10 +225,8 @@ std::vector<std::vector<float>> create_matrix(int32_t *array_of_rows,
                                               float *array_of_values,
                                               int n_rows, int n_cols,
                                               float initial_value = 0.0f) {
-  // Initialize a rows x cols matrix filled with initial_value
   std::vector<std::vector<float>> matrix(
       n_rows, std::vector<float>(n_cols, initial_value));
-  // fill the matrix
   for (int i = 0; i < n_rows; i++) {
     int row = array_of_rows[i];
     int col = array_of_cols[i];
@@ -127,12 +235,11 @@ std::vector<std::vector<float>> create_matrix(int32_t *array_of_rows,
   return matrix;
 }
 
-// init_staf_ receives dataset in COO format
-std::vector<torch::Tensor>
-init_staf_(const torch::Tensor &row_idx, // COO row idx
-           const torch::Tensor &col_idx, // COO col idx
-           const torch::Tensor &values,  // COO values
-           const size_t n_rows, const size_t n_cols) {
+std::vector<torch::Tensor> init_staf_(const torch::Tensor &row_idx,
+                                      const torch::Tensor &col_idx,
+                                      const torch::Tensor &values,
+                                      const size_t n_rows,
+                                      const size_t n_cols) {
 
   CHECK_DTYPE(row_idx, torch::kInt32);
   CHECK_DTYPE(col_idx, torch::kInt32);
@@ -145,20 +252,34 @@ init_staf_(const torch::Tensor &row_idx, // COO row idx
   auto base_matrix = create_matrix(array_of_rows, array_of_cols,
                                    array_of_values, n_rows, n_cols);
 
-  auto trie = suffix_trie();
-  trie.add_matrix_row({1, 1, 1}, 0);
-  trie.add_matrix_row({0, 1, 1}, 1);
-  trie.add_matrix_row({1, 1, 0}, 2);
-  trie.print_trie();
-  
-  
-  std::cout << "inside init_staf_()\n";
+  /* auto trie = suffix_trie(3); */
+  /**/
+  /* // Add all rows to the trie (in reverse order for suffix trie) */
+  /* trie.add_matrix_row({1, 0, 1}, 0); */
+  /* trie.add_matrix_row({1, 1, 1}, 1); */
+  /* trie.add_matrix_row({0, 1, 1}, 2); */
+  /* auto patterns = trie.get_shared_patterns(); */
+  /* trie.print_trie(); */
+  // Get all patterns from the trie
+  /* auto patterns = trie.get_shared_patterns(); */
+  /**/
+  // Create trie with known vector size (n_cols)
+  auto trie2 = suffix_trie(3);
+  trie2.add_matrix_row({1, 1, 1}, 1);
+  trie2.add_matrix_row({1, 1, 1}, 2);
+  trie2.add_matrix_row({0, 1, 1}, 3);
+
+  // Get all patterns from the trie
+  auto patterns2 = trie2.get_shared_patterns();
+  trie2.get_unique_patterns();
+
+  trie2.print_trie();
+
+  // Convert patterns to torch tensors (placeholder - modify as needed)
   std::vector<torch::Tensor> result;
+  // ... implementation to convert patterns to tensors ...
 
   return result;
 }
 
-// Actual python wrapper:
-// 1st argument function name on python side,
-// 2nd argument function name on cpp side.
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) { m.def("init_staf", &init_staf_); }
