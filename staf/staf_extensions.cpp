@@ -75,7 +75,7 @@ private:
     if (is_shared || (is_leaf && current_rows.size() > 1)) {
       std::vector<float> current_pattern = {};
       if (node->get_index() >= 0) {
-        current_pattern[node->get_index()] = 1.0f;
+        current_pattern.push_back(node->get_index());
       }
       // Only store if actually shared by multiple rows
       std::vector<int> key(current_rows.begin(), current_rows.end());
@@ -86,7 +86,7 @@ private:
       if (it != patterns.end()) {
         // Pattern exists - modify it
         if (node->get_index() >= 0) {
-          it->second[node->get_index()] = 1.0f; // Add 1.0 at current index
+          it->second.push_back(node->get_index());
         }
       }
     }
@@ -95,7 +95,7 @@ private:
 
   std::set<int> build_patterns_bottom_up_unique(
       const trie_node *node,
-      std::map<std::vector<int>, std::vector<float>> &patterns) const {
+      std::map<int, std::vector<float>> &patterns) const {
     std::set<int> current_rows = node->get_row_numbers();
     bool is_shared = node->is_shared();
     bool is_leaf = node->get_children().empty();
@@ -103,20 +103,27 @@ private:
     // Process children first (post-order traversal)
     for (const auto &child : node->get_children()) {
       std::set<int> child_rows =
-          build_patterns_bottom_up(child.get(), patterns);
+          build_patterns_bottom_up_unique(child.get(), patterns);
       current_rows.insert(child_rows.begin(), child_rows.end());
     }
 
     if (is_shared || (is_leaf && current_rows.size() > 1)) {
       return current_rows;
     }
-    if (current_rows.size() == 1) {
-      std::vector<int> key(current_rows.begin(), current_rows.end());
+    if (current_rows.size() == 1 && is_leaf) {
+      std::vector<float> current_pattern = {};
+      if (node->get_index() >= 0) {
+        current_pattern.push_back(node->get_index());
+      }
+      int key = *current_rows.begin();
+      patterns[key] = current_pattern;
+    } else if (current_rows.size() == 1) {
+      int key = *current_rows.begin();
       auto it = patterns.find(key);
       if (it != patterns.end()) {
         // Pattern exists - modify it
         if (node->get_index() >= 0) {
-          it->second[node->get_index()] = 1.0f; // Add 1.0 at current index
+          it->second.push_back(node->get_index());
         }
       }
     }
@@ -197,19 +204,15 @@ public:
     return patterns;
   }
 
-  std::map<std::vector<int>, std::vector<float>> get_unique_patterns() const {
-    std::map<std::vector<int>, std::vector<float>> patterns;
+  std::map<int, std::vector<float>> get_unique_patterns() const {
+    std::map<int, std::vector<float>> patterns;
     build_patterns_bottom_up_unique(root.get(), patterns);
     std::cout << "unique Patterns Map:\n";
 
     for (const auto &pair : patterns) {
-      // Print the key (std::vector<int>)
       std::cout << "Key: [ ";
-      for (int num : pair.first) {
-        std::cout << num << " ";
-      }
+      std::cout << pair.first << " ";
       std::cout << "] -> Values: [ ";
-
       // Print the value (std::vector<float>)
       for (float num : pair.second) {
         std::cout << num << " ";
