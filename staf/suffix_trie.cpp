@@ -32,7 +32,9 @@ private:
       }
       // Only store if actually shared by multiple rows
       std::vector<int> key(current_rows.begin(), current_rows.end());
-      patterns[key] = current_pattern;
+      if (!current_pattern.empty()) {
+        patterns[key] = current_pattern;
+      }
     } else if (current_rows.size() > 1) {
       std::vector<int> key(current_rows.begin(), current_rows.end());
       auto it = patterns.find(key);

@@ -23,6 +23,88 @@ std::vector<std::vector<float>> create_matrix(int32_t *array_of_rows,
   }
   return matrix;
 }
+
+void print_dense_matrix(const binary_csr &csr) {
+  const std::vector<int> &row_ptr = csr.get_row_ptr();
+  const std::vector<int> &col_indices = csr.get_col_indices();
+  const std::vector<float> &data = csr.get_data();
+
+  int num_rows = row_ptr.size() - 1;
+  int num_cols = 0;
+
+  // Find number of columns
+  for (int col : col_indices) {
+    if (col + 1 > num_cols) {
+      num_cols = col + 1;
+    }
+  }
+
+  for (int row = 0; row < num_rows; ++row) {
+    std::vector<float> dense_row(num_cols, 0.0f);
+    int start = row_ptr[row];
+    int end = row_ptr[row + 1];
+
+    for (int idx = start; idx < end; ++idx) {
+      dense_row[col_indices[idx]] = data[idx];
+    }
+
+    for (float val : dense_row) {
+      std::cout << val << " ";
+    }
+    std::cout << "\n";
+  }
+}
+
+std::vector<std::vector<float>> apply_shared_patterns_to_dense(
+    const binary_csr &csr,
+    const std::map<std::vector<int>, std::vector<int>> &shared_patterns,
+    int no_main_rows, int no_columns) {
+  const std::vector<int> &row_ptr = csr.get_row_ptr();
+  const std::vector<int> &col_indices = csr.get_col_indices();
+  const std::vector<float> &data = csr.get_data();
+
+  // Step 1: Initialize matrix with no_main_rows
+  std::vector<std::vector<float>> dense(no_main_rows,
+                                        std::vector<float>(no_columns, 0.0f));
+  // Step 2: Apply normal (main) rows
+  for (int row = 0; row < no_main_rows; ++row) {
+    for (int idx = row_ptr[row]; idx < row_ptr[row + 1]; ++idx) {
+      dense[row][col_indices[idx]] = data[idx];
+    }
+  }
+
+  // Step 3: Apply shared patterns (extra rows start after main rows)
+  int shared_row_idx = no_main_rows;
+  for (const auto &entry : shared_patterns) {
+    const std::vector<int> &target_rows = entry.first;
+
+    int start = row_ptr[shared_row_idx];
+    int end = row_ptr[shared_row_idx + 1];
+    std::vector<int> shared_cols(col_indices.begin() + start,
+                                 col_indices.begin() + end);
+
+    for (int row : target_rows) {
+      for (int col : shared_cols) {
+        dense[row][col] = 1.0f; // overwrite or OR-style merge
+      }
+    }
+
+    ++shared_row_idx;
+  }
+
+  return dense;
+}
+
+void print_matrix(const std::vector<std::vector<float>> &matrix) {
+  std::cout << "Final Matrix" << std::endl;
+
+  for (const auto &row : matrix) {
+    for (float val : row) {
+      std::cout << val << " ";
+    }
+    std::cout << '\n';
+  }
+}
 /*---------------------------Main function-----------------------------*/
 std::vector<torch::Tensor> init_staf_(const torch::Tensor &row_idx,
                                       const torch::Tensor &col_idx,
@@ -53,10 +135,10 @@ std::vector<torch::Tensor> init_staf_(const torch::Tensor &row_idx,
   /* auto patterns = trie.get_shared_patterns(); */
   /**/
   // Create trie with known vector size (n_cols)
-  auto trie2 = suffix_trie(3);
-  trie2.add_matrix_row({1, 1, 1}, 1);
-  trie2.add_matrix_row({1, 1, 1}, 2);
-  trie2.add_matrix_row({1, 0, 1}, 3);
+  auto trie2 = suffix_trie(4);
+  trie2.add_matrix_row({1, 1, 1, 0}, 0);
+  trie2.add_matrix_row({1, 1, 1, 1}, 1);
+  trie2.add_matrix_row({1, 0, 1, 0}, 2);
 
   // Get all patterns from the trie
   auto shared = trie2.get_shared_patterns();
@@ -65,14 +147,10 @@ std::vector<torch::Tensor> init_staf_(const torch::Tensor &row_idx,
   // print full trie
   trie2.print_trie();
 
-  // create sparse matrix for the unique paths (main matrix)
-  auto csr_unique = binary_csr(unique);
-  csr_unique.print();
-
-  // create sparse matrix for the shared paths (rows to be added after matrix
-  // operations)
-  auto csr_shared = binary_csr(shared);
-  csr_shared.print();
+  // create sparse matrix
+  auto csr = binary_csr(unique, shared, 3);
+  csr.print();
+  print_dense_matrix(csr);
 
   // Convert patterns to torch tensors (placeholder - modify as needed)
   std::vector<torch::Tensor> result;
