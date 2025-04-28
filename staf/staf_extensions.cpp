@@ -1,5 +1,6 @@
 #include "binary_csr.cpp"
 #include "suffix_trie.cpp"
+#include <cstdint>
 #include <omp.h>
 #include <torch/extension.h>
 #include <vector>
@@ -9,20 +10,6 @@
               "\"" #x "\" is not a tensor of type \"" #dtype "\"")
 
 /*-----------------------Matrix creation--------------------------------*/
-std::vector<std::vector<float>> create_matrix(int32_t *array_of_rows,
-                                              int32_t *array_of_cols,
-                                              float *array_of_values,
-                                              int n_rows, int n_cols,
-                                              float initial_value = 0.0f) {
-  std::vector<std::vector<float>> matrix(
-      n_rows, std::vector<float>(n_cols, initial_value));
-  for (int i = 0; i < n_rows; i++) {
-    int row = array_of_rows[i];
-    int col = array_of_cols[i];
-    matrix[row][col] = array_of_values[i];
-  }
-  return matrix;
-}
 
 void print_dense_matrix(const binary_csr &csr) {
   const std::vector<int> &row_ptr = csr.get_row_ptr();
@@ -95,16 +82,6 @@ std::vector<std::vector<float>> apply_shared_patterns_to_dense(
   return dense;
 }
 
-void print_matrix(const std::vector<std::vector<float>> &matrix) {
-  std::cout << "Final Matrix" << std::endl;
-
-  for (const auto &row : matrix) {
-    for (float val : row) {
-      std::cout << val << " ";
-    }
-    std::cout << '\n';
-  }
-}
 /*---------------------------Main function-----------------------------*/
 std::vector<torch::Tensor> init_staf_(const torch::Tensor &row_idx,
                                       const torch::Tensor &col_idx,
@@ -120,25 +97,10 @@ std::vector<torch::Tensor> init_staf_(const torch::Tensor &row_idx,
   int32_t *array_of_cols = col_idx.data_ptr<int32_t>();
   float *array_of_values = values.data_ptr<float>();
 
-  auto base_matrix = create_matrix(array_of_rows, array_of_cols,
-                                   array_of_values, n_rows, n_cols);
-
-  /* auto trie = suffix_trie(3); */
-  /**/
-  /* // Add all rows to the trie (in reverse order for suffix trie) */
-  /* trie.add_matrix_row({1, 0, 1}, 0); */
-  /* trie.add_matrix_row({1, 1, 1}, 1); */
-  /* trie.add_matrix_row({0, 1, 1}, 2); */
-  /* auto patterns = trie.get_shared_patterns(); */
-  /* trie.print_trie(); */
-  // Get all patterns from the trie
-  /* auto patterns = trie.get_shared_patterns(); */
-  /**/
-  // Create trie with known vector size (n_cols)
+  int32_t rows[] = {0, 0, 0, 1, 1, 1, 1, 2, 2};
+  int32_t columns[] = {0, 1, 2, 0, 1, 2, 3, 0, 2};
   auto trie2 = suffix_trie(4);
-  trie2.add_matrix_row({1, 1, 1, 0}, 0);
-  trie2.add_matrix_row({1, 1, 1, 1}, 1);
-  trie2.add_matrix_row({1, 0, 1, 0}, 2);
+  trie2.build_trie_from_tensors(rows, columns, 9);
 
   // Get all patterns from the trie
   auto shared = trie2.get_shared_patterns();

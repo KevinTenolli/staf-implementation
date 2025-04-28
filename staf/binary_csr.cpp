@@ -1,6 +1,7 @@
 #include <iostream>
 #include <map>
 #include <vector>
+
 class binary_csr {
 private:
   std::vector<int> row_ptr;
@@ -35,6 +36,7 @@ public:
       row_ptr.push_back(row_ptr.back() + pattern_cols.size());
     }
   }
+
   void print() const {
     std::cout << "Row pointers: [";
     for (size_t i = 0; i < row_ptr.size(); ++i) {

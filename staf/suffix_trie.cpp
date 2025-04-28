@@ -1,4 +1,5 @@
 #include "trie_node.cpp"
+#include <cstdint>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -11,9 +12,18 @@ private:
   std::unique_ptr<trie_node> root;
   size_t vector_size;
 
+  /*
+   * postorder traversal of a trie
+   * Args:
+   * Patterns (the map that holds the rows that share elements between them
+   * [key]:[vector<int>], and the indeces that are shared [values]:vector<int>)
+   * Returns: the rows that the previous row shares
+   * Since a node does not know which rows are located at the end of the paths
+   * between it, we propogate the rows up
+   */
   std::set<int> build_patterns_bottom_up(
       const trie_node *node,
-      std::map<std::vector<int>, std::vector<int>> &patterns) const {
+      std::map<std::vector<int>, std::vector<int>> &patterns) {
     std::set<int> current_rows = node->get_row_numbers();
     bool is_shared = node->is_shared();
     bool is_leaf = node->get_children().empty();
@@ -24,7 +34,11 @@ private:
           build_patterns_bottom_up(child.get(), patterns);
       current_rows.insert(child_rows.begin(), child_rows.end());
     }
-
+    /* if the node is shared or if its a leaf and it has more than 1 row at its
+     end, from this point up to the other point whith the same characteristics
+     or the end, the pattern is shared between many rows, we add this new
+     pattern to the map
+     */
     if (is_shared || (is_leaf && current_rows.size() > 1)) {
       std::vector<int> current_pattern = {};
       if (node->get_index() >= 0) {
@@ -36,6 +50,10 @@ private:
         patterns[key] = current_pattern;
       }
     } else if (current_rows.size() > 1) {
+      /* if the list of rows that the node path owns matches an entry in the
+       * map(matches the key), we add the node value(column index) to the map
+       */
+
       std::vector<int> key(current_rows.begin(), current_rows.end());
       auto it = patterns.find(key);
       if (it != patterns.end()) {
@@ -84,10 +102,6 @@ private:
     return current_rows;
   }
 
-public:
-  suffix_trie(size_t size)
-      : root(std::make_unique<trie_node>()), vector_size(size) {}
-  // utility function to print the nodes
   void print_node(const trie_node *node, const std::string &prefix,
                   bool is_last) const {
     std::cout << prefix << (is_last ? "└── " : "├── ");
@@ -110,33 +124,52 @@ public:
     }
   }
 
-  void print_trie() {
-    if (!root) {
-      std::cout << "Trie is empty" << std::endl;
-      return;
-    }
-    std::cout << "Suffix Trie Structure:" << std::endl;
-    print_node(root.get(), "", true);
-  }
-  void add_matrix_row(const std::vector<float> &row, int row_num) {
-    auto *node = root.get();
-    bool is_last_non_zero = false;
-    for (int i = row.size() - 1; i >= 0; --i) {
-      if (row[i] != 0) {
-        node = node->has_child(i) ? node->get_child(i) : node->add_child(i);
-        if (i == 0 || row[i - 1] == 0) {
-          is_last_non_zero = true;
-        }
+public:
+  /*
+   * Constructor
+   * Initializes the trie
+   * Input size:t_size the number of columns in a matrix, which is the longest
+   * length of a trie path
+   */
+  suffix_trie(size_t size)
+      : root(std::make_unique<trie_node>()), vector_size(size) {}
 
-        // If this is the last non-zero element, add the row number to the node
-        if (is_last_non_zero) {
-          node->add_row_number(row_num);
-        }
+  void build_trie_from_tensors(int32_t *rows, int32_t *columns,
+                               int num_elements) {
+    auto *node = root.get();
+    auto previous_row = -1; // Initialize to an invalid row
+
+    // Process elements in reverse order
+    for (int i = num_elements - 1; i >= 0; i--) {
+      int current_row = rows[i];
+      int current_col = columns[i];
+
+      // If we've moved to a new row, reset to root
+      if (previous_row != current_row) {
+        node = root.get();
+        previous_row = current_row;
+      }
+
+      // Add the column as a child
+      node = node->has_child(current_col) ? node->get_child(current_col)
+                                          : node->add_child(current_col);
+
+      // If this is the first element in reverse order for this row, store the
+      // row number (which means it's the last non-zero element when considering
+      // forward order)
+      if (i == 0 || rows[i - 1] != current_row) {
+        node->add_row_number(current_row);
       }
     }
   }
-
-  std::map<std::vector<int>, std::vector<int>> get_shared_patterns() const {
+  /*
+   * method to get a map for the shared patterns(rows and the indeces they
+   * share)
+   * returns -> patterns: map, a map which has:
+   * row numbers as key: vector<int>
+   * indeces where the rows have a non 0 as value: vector<int>
+   */
+  std::map<std::vector<int>, std::vector<int>> get_shared_patterns() {
     std::map<std::vector<int>, std::vector<int>> patterns;
     build_patterns_bottom_up(root.get(), patterns);
     std::cout << "Shared patterns map:\n";
@@ -156,7 +189,14 @@ public:
     return patterns;
   }
 
-  std::map<int, std::vector<int>> get_unique_patterns() const {
+  /*
+   * method to get a map for the unique patterns(rows that dont have shared
+   * elements)
+   * returns -> patterns: map, a map which has:
+   * row number as key: int
+   * indeces where the row is non 0 as value: vector<int>
+   */
+  std::map<int, std::vector<int>> get_unique_patterns() {
     std::map<int, std::vector<int>> patterns;
     build_patterns_bottom_up_unique(root.get(), patterns);
     std::cout << "Unique patterns map:\n";
@@ -171,5 +211,18 @@ public:
       std::cout << "]\n";
     }
     return patterns;
+  }
+
+  /*
+   * ONLY USE FOR TESTING AND DEBUGGING SMALL MATRICES
+   * method to print the trie
+   */
+  void print_trie() {
+    if (!root) {
+      std::cout << "Trie is empty" << std::endl;
+      return;
+    }
+    std::cout << "Suffix Trie Structure:" << std::endl;
+    print_node(root.get(), "", true);
   }
 };
