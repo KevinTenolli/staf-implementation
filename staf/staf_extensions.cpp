@@ -97,9 +97,12 @@ std::vector<torch::Tensor> init_staf_(const torch::Tensor &row_idx,
   int32_t *array_of_cols = col_idx.data_ptr<int32_t>();
   float *array_of_values = values.data_ptr<float>();
 
+  /* int32_t rows[] = {0, 0, 0, 1, 1, 1, 1, 2, 2}; */
+  /* int32_t columns[] = {0, 1, 2, 0, 1, 2, 3, 0, 2}; */
+
   int32_t rows[] = {0, 0, 0, 1, 1, 1, 1, 2, 2};
-  int32_t columns[] = {0, 1, 2, 0, 1, 2, 3, 0, 2};
-  auto trie2 = suffix_trie(4);
+  int32_t columns[] = {4, 5, 6, 4, 5, 6, 7, 4, 6};
+  auto trie2 = suffix_trie(8);
   trie2.build_trie_from_tensors(rows, columns, 9);
 
   // Get all patterns from the trie
