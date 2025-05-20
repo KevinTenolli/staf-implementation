@@ -1,6 +1,7 @@
 #ifndef SUFFIX_FOREST_HPP
 #define SUFFIX_FOREST_HPP
 
+#include "binary_csr.hpp"
 #include "suffix_trie.hpp"
 #include <cstdint>
 #include <memory>
@@ -38,6 +39,22 @@ public:
    */
   void create_forest(const int32_t *col_ptr, const int32_t *row_ind,
                      int num_cols);
+
+  /**
+   * @brief Builds a binary CSR matrix from the unique and shared patterns
+   *        stored across all suffix tries in the forest.
+   *
+   * This function traverses all tries in the forest to extract both:
+   * - Unique patterns: rows mapped to their respective column indices.
+   * - Shared patterns: column index patterns shared across multiple rows.
+   *
+   * It then merges these patterns into a unified representation and uses them
+   * to construct a `binary_csr` object.
+   *
+   * @return A `binary_csr` instance representing the sparse matrix formed from
+   *         the combined unique and shared patterns.
+   */
+  binary_csr build_csr();
 
   /**
    * @brief Print a representation of the entire suffix forest to stdout.

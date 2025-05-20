@@ -60,14 +60,14 @@ std::set<int> suffix_trie::build_patterns_bottom_up(
 }
 
 std::set<int> suffix_trie::build_patterns_bottom_up_unique(
-    const trie_node *node,
-    std::map<int, std::vector<int>> &patterns) const {
+    const trie_node *node, std::map<int, std::vector<int>> &patterns) const {
   std::set<int> current_rows = node->get_row_numbers();
   bool is_shared = node->is_shared();
   bool is_leaf = node->get_children().empty();
 
   for (const auto &child : node->get_children()) {
-    std::set<int> child_rows = build_patterns_bottom_up_unique(child.get(), patterns);
+    std::set<int> child_rows =
+        build_patterns_bottom_up_unique(child.get(), patterns);
     current_rows.insert(child_rows.begin(), child_rows.end());
   }
 
@@ -103,9 +103,12 @@ trie_node *suffix_trie::search_node_with_row(trie_node *node, int32_t row) {
   return nullptr;
 }
 
-void suffix_trie::print_node(const trie_node *node, const std::string &prefix, bool is_last) const {
+void suffix_trie::print_node(const trie_node *node, const std::string &prefix,
+                             bool is_last) const {
   std::cout << prefix << (is_last ? "└── " : "├── ");
-  std::cout << (node->get_index() == -1 ? "ROOT" : "Index " + std::to_string(node->get_index()));
+  std::cout << (node->get_index() == -1
+                    ? "ROOT"
+                    : "Index " + std::to_string(node->get_index()));
 
   if (!node->get_row_numbers().empty()) {
     std::cout << " (rows:";
@@ -116,21 +119,25 @@ void suffix_trie::print_node(const trie_node *node, const std::string &prefix, b
   std::cout << std::endl;
 
   const auto &children = node->get_children();
-  for (size_t i = 0; i < children.size(); ++i) {
-    print_node(children[i].get(), prefix + (is_last ? "    " : "│   "), i == children.size() - 1);
+  for (size_t i = 0; i < children.size(); i++) {
+    print_node(children[i].get(), prefix + (is_last ? "    " : "│   "),
+               i == children.size() - 1);
   }
 }
 
-std::map<std::vector<int>, std::vector<int>> suffix_trie::get_shared_patterns() {
+std::map<std::vector<int>, std::vector<int>>
+suffix_trie::get_shared_patterns() {
   std::map<std::vector<int>, std::vector<int>> patterns;
   build_patterns_bottom_up(root.get(), patterns);
   std::cout << "Shared patterns map:\n";
 
   for (const auto &pair : patterns) {
     std::cout << "Rows: [ ";
-    for (int num : pair.first) std::cout << num << " ";
+    for (int num : pair.first)
+      std::cout << num << " ";
     std::cout << "] -> Columns: [ ";
-    for (int num : pair.second) std::cout << num << " ";
+    for (int num : pair.second)
+      std::cout << num << " ";
     std::cout << "]\n";
   }
   return patterns;
@@ -143,7 +150,8 @@ std::map<int, std::vector<int>> suffix_trie::get_unique_patterns() {
 
   for (const auto &pair : patterns) {
     std::cout << "Row: [ " << pair.first << " ] -> Columns: [ ";
-    for (int num : pair.second) std::cout << num << " ";
+    for (int num : pair.second)
+      std::cout << num << " ";
     std::cout << "]\n";
   }
   return patterns;
@@ -184,17 +192,11 @@ int suffix_trie::false_insert(int col, const int32_t *rows, int size) {
   return new_nodes * 2 + new_rows;
 }
 
-void suffix_trie::true_insert() {
-  true_insert_node(root.get());
-}
+void suffix_trie::true_insert() { true_insert_node(root.get()); }
 
-void suffix_trie::delete_false_nodes() {
-  delete_false_node(root.get());
-}
+void suffix_trie::delete_false_nodes() { delete_false_node(root.get()); }
 
-bool suffix_trie::is_empty() {
-  return root->is_empty();
-}
+bool suffix_trie::is_empty() { return root->is_empty(); }
 
 void suffix_trie::print_trie() {
   if (!root) {

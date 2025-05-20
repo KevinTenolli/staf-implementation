@@ -38,6 +38,7 @@ std::vector<torch::Tensor> init_staf_(const torch::Tensor &row_idx,
   suffix_forest forest;
   forest.create_forest(col_pointers, row_indices, col_size);
   forest.print_forest();
+  forest.build_csr();
 
   // Convert shared patterns to Torch tensors
   std::vector<torch::Tensor> result;
