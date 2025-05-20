@@ -9,8 +9,6 @@
 #include <string>
 #include <vector>
 
-class trie_node; // Forward declaration
-
 class suffix_trie {
 private:
   /**
