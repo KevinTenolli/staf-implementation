@@ -1,15 +1,11 @@
-#include "binary_csr.cpp"
-#include "suffix_forest.cpp"
+#include "suffix_forest.hpp"
 #include <cstdint>
 #include <omp.h>
 #include <torch/extension.h>
-#include <vector>
 
 #define CHECK_DTYPE(x, dtype)                                                  \
   TORCH_CHECK(x.scalar_type() == dtype,                                        \
               "\"" #x "\" is not a tensor of type \"" #dtype "\"")
-
-/*-----------------------Matrix creation--------------------------------*/
 
 /*---------------------------Main function-----------------------------*/
 std::vector<torch::Tensor> init_staf_(const torch::Tensor &row_idx,
@@ -26,23 +22,25 @@ std::vector<torch::Tensor> init_staf_(const torch::Tensor &row_idx,
   int32_t *array_of_cols = col_idx.data_ptr<int32_t>();
   float *array_of_values = values.data_ptr<float>();
 
+  // Example static input
   int32_t row_indices[] = {
       0, 2, 3, 4, // col 0
       0, 2, 3, 4, // col 1
-      1, 4,       // col 2
+      1,          // col 2
       1, 4,       // col 3
       0, 2, 3, 4, // col 4
       0, 2, 3, 4  // col 5
   };
 
-  int32_t col_pointers[] = {0, 4, 8, 10, 12, 16, 20};
-  auto col_size = 6;
-  auto forest = suffix_forest();
+  int32_t col_pointers[] = {0, 4, 8, 9, 11, 15, 19};
+  int32_t col_size = 6;
+
+  suffix_forest forest;
   forest.create_forest(col_pointers, row_indices, col_size);
   forest.print_forest();
-  // Convert patterns to torch tensors (placeholder - modify as needed)
+
+  // Convert shared patterns to Torch tensors
   std::vector<torch::Tensor> result;
-  // ... implementation to convert patterns to tensors ...
 
   return result;
 }
