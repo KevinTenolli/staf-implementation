@@ -10,8 +10,31 @@
 class suffix_trie {
 private:
   std::unique_ptr<trie_node> root;
-  size_t vector_size;
 
+  void true_insert_node(trie_node *node, trie_node *parent = nullptr) {
+    for (auto &child : node->get_children()) {
+      true_insert_node(child.get(), node);
+    }
+
+    if (node->is_false_inserted()) {
+      node->true_insert();
+
+      if (parent) {
+        for (int row : node->get_row_numbers()) {
+          parent->remove_row(row);
+        }
+      }
+    }
+  }
+
+  void delete_false_node(trie_node *node) {
+    if (!node)
+      return;
+    for (const auto &child : node->get_children()) {
+      delete_false_node(child.get());
+    }
+    node->remove_child_if_false_inserted();
+  }
   /*
    * postorder traversal of a trie
    * Args:
@@ -102,6 +125,18 @@ private:
     return current_rows;
   }
 
+  trie_node *search_node_with_row(trie_node *node, int32_t row) {
+    if (node->has_row_number(row)) {
+      return node;
+    }
+    for (const auto &child : node->get_children()) {
+      trie_node *result = search_node_with_row(child.get(), row);
+      if (result)
+        return result;
+    }
+    return nullptr;
+  }
+
   void print_node(const trie_node *node, const std::string &prefix,
                   bool is_last) const {
     std::cout << prefix << (is_last ? "└── " : "├── ");
@@ -128,40 +163,9 @@ public:
   /*
    * Constructor
    * Initializes the trie
-   * Input size:t_size the number of columns in a matrix, which is the longest
-   * length of a trie path
    */
-  suffix_trie(size_t size)
-      : root(std::make_unique<trie_node>()), vector_size(size) {}
+  suffix_trie() : root(std::make_unique<trie_node>()) {}
 
-  void build_trie_from_tensors(int32_t *rows, int32_t *columns,
-                               int num_elements) {
-    auto *node = root.get();
-    auto previous_row = -1; // Initialize to an invalid row
-
-    // Process elements in reverse order
-    for (int i = num_elements - 1; i >= 0; i--) {
-      int current_row = rows[i];
-      int current_col = columns[i];
-
-      // If we've moved to a new row, reset to root
-      if (previous_row != current_row) {
-        node = root.get();
-        previous_row = current_row;
-      }
-
-      // Add the column as a child
-      node = node->has_child(current_col) ? node->get_child(current_col)
-                                          : node->add_child(current_col);
-
-      // If this is the first element in reverse order for this row, store the
-      // row number (which means it's the last non-zero element when considering
-      // forward order)
-      if (i == 0 || rows[i - 1] != current_row) {
-        node->add_row_number(current_row);
-      }
-    }
-  }
   /*
    * method to get a map for the shared patterns(rows and the indeces they
    * share)
@@ -212,6 +216,50 @@ public:
     }
     return patterns;
   }
+
+  int false_insert(int col, const int32_t *rows, int size) {
+    int new_nodes = 0;
+    int new_rows = 0;
+
+    for (int i = 0; i < size; i++) {
+      int32_t row = rows[i];
+      trie_node *node = search_node_with_row(root.get(), row);
+
+      // Case 1: Row not found in trie — use root
+      if (!node) {
+        node = root.get();
+        if (node->has_child(col)) {
+          trie_node *child = node->get_child(col);
+          child->add_row_number(row);
+          new_rows++;
+        } else {
+          trie_node *inserted_node = node->add_child(col, true);
+          inserted_node->add_row_number(row);
+          new_nodes++;
+          new_rows++;
+        }
+      }
+      // Case 2: Row found in trie
+      else {
+        if (node->has_child(col)) {
+          trie_node *child = node->get_child(col);
+          child->add_row_number(row);
+        } else {
+          trie_node *inserted_node = node->add_child(col, true);
+          inserted_node->add_row_number(row);
+          new_nodes++;
+        }
+      }
+    }
+
+    return new_nodes * 2 + new_rows;
+  }
+
+  void true_insert() { true_insert_node(root.get()); }
+
+  void delete_false_nodes() { delete_false_node(root.get()); }
+
+  bool is_empty() { return root->is_empty(); }
 
   /*
    * ONLY USE FOR TESTING AND DEBUGGING SMALL MATRICES
