@@ -13,8 +13,7 @@ if __name__ == '__main__':
     # dataset
     dataset = load_dataset(args.dataset)
     print_dataset_info(f"{args.dataset}", dataset)
-    
+
     # adjacency matrix
     a = set_adjacency_matrix(args.format, dataset.edge_index)
     del dataset.edge_index
-

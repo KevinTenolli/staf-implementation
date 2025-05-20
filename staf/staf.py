@@ -1,6 +1,7 @@
 import torch
 from staf import staf_cpp as staf_cpp
 
+
 class staf():
 
     def __init__(self, edge_index, edge_values):
@@ -9,8 +10,8 @@ class staf():
 
         # convert matrix of deltas to COO tensor (torch.float32)
         coo_tensor = torch.sparse_coo_tensor(
-            edge_index.to(torch.int32), 
-            edge_values.to(torch.float32), 
+            edge_index.to(torch.int32),
+            edge_values.to(torch.float32),
             (n_rows, n_cols)
         ).coalesce()
 
