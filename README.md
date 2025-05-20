@@ -24,7 +24,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 # 3. Install required Python packages
-pip install torch torch-geometric
+pip install torch torch-geometric ogb
 
 # Optional: install all dependencies from a requirements file
 # pip install -r requirements.txt
