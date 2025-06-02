@@ -1,9 +1,11 @@
 #include "binary_csr.hpp"
 #include <iostream>
+#include <vector>
 
-binary_csr::binary_csr(const std::map<int, std::vector<int>> &unique_patterns,
-                       std::map<std::vector<int>, std::vector<int>> &shared_patterns,
-                       int no_rows) {
+binary_csr::binary_csr(
+    const std::map<int, std::vector<int>> &unique_patterns,
+    std::map<std::vector<int>, std::vector<int>> &shared_patterns,
+    int no_rows) {
   row_ptr.reserve(no_rows + 1);
   row_ptr.push_back(0);
 
@@ -24,9 +26,12 @@ binary_csr::binary_csr(const std::map<int, std::vector<int>> &unique_patterns,
   for (const auto &pair : shared_patterns) {
     const std::vector<int> &pattern_cols = pair.second;
 
-    col_indices.insert(col_indices.end(), pattern_cols.begin(), pattern_cols.end());
+    col_indices.insert(col_indices.end(), pattern_cols.begin(),
+                       pattern_cols.end());
     data.insert(data.end(), pattern_cols.size(), 1.0f);
     row_ptr.push_back(row_ptr.back() + pattern_cols.size());
+    std::vector rows_to_map = pair.first;
+    mapped_rows.emplace_back(rows_to_map);
   }
 }
 
@@ -84,14 +89,13 @@ void binary_csr::print_dense_matrix() const {
     std::cout << "\n";
   }
 }
-const std::vector<int> &binary_csr::get_row_ptr() const {
-  return row_ptr;
-}
+const std::vector<int> &binary_csr::get_row_ptr() const { return row_ptr; }
 
 const std::vector<int> &binary_csr::get_col_indices() const {
   return col_indices;
 }
 
-const std::vector<float> &binary_csr::get_data() const {
-  return data;
-}
+const std::vector<float> &binary_csr::get_data() const { return data; }
+const std::vector<std::vector<int>> &binary_csr::get_mapped_rows() const {
+  return mapped_rows;
+};

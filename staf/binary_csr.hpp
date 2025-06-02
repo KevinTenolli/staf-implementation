@@ -6,17 +6,19 @@
 
 /**
  * @class binary_csr
- * @brief Represents a binary sparse matrix in Compressed Sparse Row (CSR) format.
+ * @brief Represents a binary sparse matrix in Compressed Sparse Row (CSR)
+ * format.
  *
- * This class takes in unique and shared patterns to construct a binary CSR matrix
- * where values are either 1.0 (present) or 0.0 (absent). It provides functionality
- * to print the CSR structure and also its dense representation.
+ * This class takes in unique and shared patterns to construct a binary CSR
+ * matrix where values are either 1.0 (present) or 0.0 (absent). It provides
+ * functionality to print the CSR structure and also its dense representation.
  */
 class binary_csr {
 private:
-  std::vector<int> row_ptr;       ///< CSR row pointer array
-  std::vector<int> col_indices;   ///< CSR column indices
-  std::vector<float> data;        ///< CSR data values (always 1.0 for binary matrix)
+  std::vector<int> row_ptr;     ///< CSR row pointer array
+  std::vector<int> col_indices; ///< CSR column indices
+  std::vector<float> data; ///< CSR data values (always 1.0 for binary matrix)
+  std::vector<std::vector<int>> mapped_rows;
 
 public:
   /**
@@ -24,8 +26,8 @@ public:
    *
    * @param unique_patterns A map of row indices to vectors of column indices.
    *                        Represents the unique entries per row.
-   * @param shared_patterns A map of common column patterns mapped to the list of rows
-   *                        that share them. These are appended after unique patterns.
+   * @param shared_patterns A map of common column patterns mapped to the list
+   * of rows that share them. These are appended after unique patterns.
    * @param no_rows The total number of rows in the matrix.
    */
   binary_csr(const std::map<int, std::vector<int>> &unique_patterns,
@@ -59,6 +61,8 @@ public:
    * @return const reference to the data vector.
    */
   const std::vector<float> &get_data() const;
+
+  const std::vector<std::vector<int>> &get_mapped_rows() const;
 };
 
 #endif

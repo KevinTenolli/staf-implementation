@@ -129,35 +129,17 @@ std::map<std::vector<int>, std::vector<int>>
 suffix_trie::get_shared_patterns() {
   std::map<std::vector<int>, std::vector<int>> patterns;
   build_patterns_bottom_up(root.get(), patterns);
-  std::cout << "Shared patterns map:\n";
-
-  for (const auto &pair : patterns) {
-    std::cout << "Rows: [ ";
-    for (int num : pair.first)
-      std::cout << num << " ";
-    std::cout << "] -> Columns: [ ";
-    for (int num : pair.second)
-      std::cout << num << " ";
-    std::cout << "]\n";
-  }
   return patterns;
 }
 
 std::map<int, std::vector<int>> suffix_trie::get_unique_patterns() {
   std::map<int, std::vector<int>> patterns;
   build_patterns_bottom_up_unique(root.get(), patterns);
-  std::cout << "Unique patterns map:\n";
-
-  for (const auto &pair : patterns) {
-    std::cout << "Row: [ " << pair.first << " ] -> Columns: [ ";
-    for (int num : pair.second)
-      std::cout << num << " ";
-    std::cout << "]\n";
-  }
   return patterns;
 }
 
-int suffix_trie::false_insert(int col, const int32_t *rows, int size) {
+int suffix_trie::false_insert(int col, const int32_t *rows, int size,
+                              size_t score_lambda) {
   int new_nodes = 0;
   int new_rows = 0;
 
@@ -189,7 +171,7 @@ int suffix_trie::false_insert(int col, const int32_t *rows, int size) {
     }
   }
 
-  return new_nodes * 2 + new_rows;
+  return new_nodes * score_lambda + new_rows;
 }
 
 void suffix_trie::true_insert() { true_insert_node(root.get()); }

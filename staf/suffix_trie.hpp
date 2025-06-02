@@ -109,7 +109,7 @@ public:
    * @param size Number of rows to insert.
    * @return Calculated score for the column insertion.
    */
-  int false_insert(int col, const int32_t *rows, int size);
+  int false_insert(int col, const int32_t *rows, int size, size_t score_lambda);
 
   /**
    * @brief Performs a "true" insertion phase in the trie after all false

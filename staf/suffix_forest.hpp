@@ -12,7 +12,7 @@ public:
   /**
    * @brief Constructs an empty suffix_forest.
    */
-  suffix_forest();
+  suffix_forest(size_t nr_tries, size_t score_lambda);
 
   /**
    * @brief Returns the number of suffix tries in the forest.
@@ -54,7 +54,7 @@ public:
    * @return A `binary_csr` instance representing the sparse matrix formed from
    *         the combined unique and shared patterns.
    */
-  binary_csr build_csr();
+  binary_csr build_csr(int n_rows);
 
   /**
    * @brief Print a representation of the entire suffix forest to stdout.
@@ -63,6 +63,8 @@ public:
   void print_forest();
 
 private:
+  size_t nr_tries;
+  size_t score_lambda;
   /**
    * @brief Container holding the suffix tries in the forest.
    * Each suffix_trie corresponds to a structure built from matrix columns.

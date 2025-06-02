@@ -1,5 +1,7 @@
+#include "binary_csr.hpp"
 #include "suffix_forest.hpp"
 #include <cstdint>
+#include <iostream>
 #include <omp.h>
 #include <torch/extension.h>
 
@@ -8,19 +10,19 @@
               "\"" #x "\" is not a tensor of type \"" #dtype "\"")
 
 /*---------------------------Main function-----------------------------*/
-std::vector<torch::Tensor> init_staf_(const torch::Tensor &row_idx,
-                                      const torch::Tensor &col_idx,
-                                      const torch::Tensor &values,
-                                      const size_t n_rows,
-                                      const size_t n_cols) {
+std::tuple<std::vector<torch::Tensor>, std::vector<std::vector<int>>>
+init_staf_(const torch::Tensor &col_ptr, const torch::Tensor &row_idx,
+           const torch::Tensor &values, const size_t n_rows,
+           const size_t n_cols, const size_t score_lambda,
+           const size_t nr_tries) {
 
+  CHECK_DTYPE(col_ptr, torch::kInt32);
   CHECK_DTYPE(row_idx, torch::kInt32);
-  CHECK_DTYPE(col_idx, torch::kInt32);
   CHECK_DTYPE(values, torch::kFloat32);
 
-  int32_t *array_of_rows = row_idx.data_ptr<int32_t>();
-  int32_t *array_of_cols = col_idx.data_ptr<int32_t>();
-  float *array_of_values = values.data_ptr<float>();
+  /* int32_t *col_pointers = col_ptr.data_ptr<int32_t>(); */
+  /* int32_t *row_indices = row_idx.data_ptr<int32_t>(); */
+  /* float *array_of_values = values.data_ptr<float>(); */
 
   // Example static input
   int32_t row_indices[] = {
@@ -31,19 +33,26 @@ std::vector<torch::Tensor> init_staf_(const torch::Tensor &row_idx,
       0, 2, 3, 4, // col 4
       0, 2, 3, 4  // col 5
   };
-
   int32_t col_pointers[] = {0, 4, 8, 9, 11, 15, 19};
   int32_t col_size = 6;
 
-  suffix_forest forest;
+  suffix_forest forest(nr_tries, score_lambda);
   forest.create_forest(col_pointers, row_indices, col_size);
   forest.print_forest();
-  forest.build_csr();
+  auto binary_csr = forest.build_csr(6);
 
-  // Convert shared patterns to Torch tensors
-  std::vector<torch::Tensor> result;
+  std::vector<torch::Tensor> csr_tensors;
 
-  return result;
+  auto row_ptr_vec = binary_csr.get_row_ptr();
+  csr_tensors.push_back(torch::tensor(row_ptr_vec, torch::kInt32));
+
+  auto col_indices_vec = binary_csr.get_col_indices();
+  csr_tensors.push_back(torch::tensor(col_indices_vec, torch::kInt32));
+
+  auto data_vec = binary_csr.get_data();
+  csr_tensors.push_back(torch::tensor(data_vec, torch::kFloat32));
+
+  return std::make_tuple(csr_tensors, binary_csr.get_mapped_rows());
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) { m.def("init_staf", &init_staf_); }
