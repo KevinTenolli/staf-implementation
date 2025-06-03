@@ -5,14 +5,12 @@ import json
 
 
 def main():
-    # Get paths for input files relative to this script
     current_dir = os.path.dirname(__file__)
     parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
     csr_file_name = os.path.join(parent_dir, "csr_tensors.pt")
     shared_patterns_file_name = os.path.join(
         parent_dir, "shared_patterns.json")
 
-    # Check if files exist
     if not os.path.exists(csr_file_name):
         print(f"Error: CSR file '{csr_file_name}' not found.")
         return
@@ -22,7 +20,6 @@ def main():
               shared_patterns_file_name}' not found.")
         return
 
-    # Load CSR data (PyTorch tensors -> numpy arrays for efficient processing)
     try:
         data = torch.load(csr_file_name)
         row_ptr = data['row_ptr'].cpu().numpy()
@@ -32,7 +29,6 @@ def main():
         print(f"Failed to load CSR data: {e}")
         return
 
-    # Load shared patterns JSON data (contains patterns and n_rows for splitting)
     try:
         with open(shared_patterns_file_name, "r") as f:
             shared_data = json.load(f)
@@ -42,8 +38,7 @@ def main():
         print(f"Failed to load shared patterns: {e}")
         return
 
-    # === Convert CSR to COO format using numpy for efficiency ===
-    # Calculate number of columns by taking max of col_indices + 1 (if data exists)
+    # === Convert CSR to COO format using numpy ===
     n_cols = int(col_indices.max()) + 1 if len(col_indices) > 0 else 0
 
     # Total number of nonzeros in the sparse matrix
@@ -94,7 +89,6 @@ def main():
             if len(target_rows) == 0 or len(target_cols) == 0:
                 continue
 
-            # Efficient replication:
             # Repeat each target_row for every column in target_cols
             repeated_rows = np.repeat(target_rows, len(target_cols))
 
@@ -112,38 +106,40 @@ def main():
     final_cols_t = torch.from_numpy(final_cols).long()
     final_vals_t = torch.from_numpy(final_vals)
 
-    # === Build final sparse COO tensor WITHOUT specifying size explicitly ===
-    # Let PyTorch infer the size from the indices automatically
+    # === Build final sparse COO tensor ===
     final_coo = torch.sparse_coo_tensor(
         torch.stack([final_rows_t, final_cols_t]),
         final_vals_t
-    ).coalesce()  # coalesce to sum duplicates and sort
+    ).coalesce()
 
-    print("\n✅ Final Combined COO Tensor:")
-    print(final_coo)
-
-    # Convert to CSC format for column-based operations
     final_csc = final_coo.to_sparse_csc()
     print("\n✅ Final Combined CSC Tensor:")
-    print(final_csc)
 
-    # === Example expected tensors for validation (replace with your own data) ===
-    expected_row_indices = torch.tensor(
-        [0, 2, 3, 4, 0, 2, 3, 4, 1, 1, 4, 0, 2, 3, 4, 0, 2, 3, 4], dtype=torch.int32)
-    expected_col_pointers = torch.tensor(
-        [0, 4, 8, 9, 11, 15, 19], dtype=torch.int32)
+    reference_file = os.path.join(parent_dir, "data.pt")
 
-    # Get actual CSC structure arrays for validation
-    actual_row_indices = final_csc.row_indices()
-    actual_col_pointers = final_csc.ccol_indices()
+    if not os.path.exists(reference_file):
+        print(f"Error: Reference data file '{reference_file}' not found.")
+        return
 
-    print("\n📌 Expected Row Indices:", expected_row_indices)
-    print("📌 Actual   Row Indices:", actual_row_indices)
-    print("✅ Match:", torch.equal(expected_row_indices, actual_row_indices))
+    try:
+        ref_data = torch.load(reference_file)
+        ref_csc = ref_data['csc']
+    except Exception as e:
+        print(f"Failed to load reference CSC tensor: {e}")
+        return
 
-    print("\n📌 Expected Column Pointers:", expected_col_pointers)
-    print("📌 Actual   Column Pointers:", actual_col_pointers)
-    print("✅ Match:", torch.equal(expected_col_pointers, actual_col_pointers))
+    print("\n=== Comparing computed CSC with reference CSC ===")
+
+    rows_match = torch.equal(final_csc.row_indices(), ref_csc.row_indices())
+    print(f"Row indices match: {rows_match}")
+
+    cols_match = torch.equal(final_csc.ccol_indices(), ref_csc.ccol_indices())
+    print(f"Column pointers match: {cols_match}")
+
+    if rows_match and cols_match:
+        print("✅ Final CSC tensor matches reference CSC tensor!")
+    else:
+        print("❌ Final CSC tensor does NOT match reference CSC tensor.")
 
 
 if __name__ == "__main__":

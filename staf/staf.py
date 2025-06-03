@@ -16,6 +16,7 @@ class staf():
             edge_values.to(torch.float32),
             (n_rows, n_cols)
         ).coalesce().to_sparse_csc()
+        torch.save({'csc': csc_tensor.cpu()}, "data.pt")
 
         result = staf_cpp.init_staf(
             csc_tensor.ccol_indices().to(dtype=torch.int32),
