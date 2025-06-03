@@ -28,7 +28,13 @@ setup(
     ext_modules=[
         CppExtension(
             'staf_cpp',
-            ['staf_extensions.cpp'],
+            [
+                'staf_extensions.cpp',
+                'suffix_forest.cpp',
+                'suffix_trie.cpp',
+                'binary_csr.cpp',
+                'trie_node.cpp'
+            ],
             extra_compile_args=extra_compile_args,
             extra_link_args=extra_link_args,
         ),
