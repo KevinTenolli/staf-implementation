@@ -23,7 +23,6 @@ init_staf_(const torch::Tensor &col_ptr, const torch::Tensor &row_idx,
   int32_t *col_pointers = col_ptr.data_ptr<int32_t>();
   int32_t *row_indices = row_idx.data_ptr<int32_t>();
   float *array_of_values = values.data_ptr<float>();
-
   // Example static input
   /* int32_t row_indices[] = { */
   /*     0, 2, 3, 4, // col 0 */
@@ -38,7 +37,6 @@ init_staf_(const torch::Tensor &col_ptr, const torch::Tensor &row_idx,
 
   suffix_forest forest(nr_tries, score_lambda);
   forest.create_forest(col_pointers, row_indices, n_cols);
-  forest.print_forest();
   auto binary_csr = forest.build_csr(n_rows);
 
   std::vector<torch::Tensor> csr_tensors;

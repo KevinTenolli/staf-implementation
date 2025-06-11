@@ -22,6 +22,7 @@ void suffix_forest::create_forest(const int32_t *col_ptr,
     int start = col_ptr[col];
     int end = col_ptr[col + 1];
     int count = end - start;
+    std::cout << "iteration " << col << "/" << num_cols - 1 << std::endl;
 
     const int32_t *rows = &row_ind[start];
     int selected_trie = false_insert_all(col, rows, count);
@@ -35,17 +36,33 @@ int suffix_forest::false_insert_all(int col, const int32_t *rows, int count) {
     tries.emplace_back(std::make_unique<suffix_trie>());
   }
 
-  std::tuple<int, int> optimal_trie{-1, std::numeric_limits<int>::max()};
-  for (size_t i = 0; i < tries.size(); ++i) {
-    int score = tries[i]->false_insert(col, rows, count, this->score_lambda);
-    if (score < std::get<1>(optimal_trie)) {
-      optimal_trie = {i, score};
+  std::tuple<int, int> global_optimal{-1, std::numeric_limits<int>::max()};
+
+#pragma omp parallel
+  {
+    std::tuple<int, int> local_optimal{-1, std::numeric_limits<int>::max()};
+
+#pragma omp for nowait
+    for (int i = 0; i < static_cast<int>(tries.size()); ++i) {
+      int score = tries[i]->false_insert(col, rows, count, this->score_lambda);
+      if (score < std::get<1>(local_optimal)) {
+        local_optimal = {i, score};
+      }
+    }
+
+#pragma omp critical
+    {
+      if (std::get<1>(local_optimal) < std::get<1>(global_optimal)) {
+        global_optimal = local_optimal;
+      }
     }
   }
-  return std::get<0>(optimal_trie);
+
+  return std::get<0>(global_optimal);
 }
 
 void suffix_forest::true_insert(int selected_trie) {
+#pragma omp parallel for
   for (size_t i = 0; i < tries.size(); i++) {
     if (selected_trie == i) {
       tries[i]->true_insert();

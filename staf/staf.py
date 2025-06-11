@@ -8,7 +8,6 @@ class staf():
 
     def __init__(self, edge_index, edge_values, l, m):
 
-        # check if its right
         n_rows = n_cols = max(edge_index[0].max(), edge_index[1].max()) + 1
 
         csc_tensor = torch.sparse_coo_tensor(
@@ -24,9 +23,7 @@ class staf():
             csc_tensor.values().to(dtype=torch.float32),
             n_rows, n_cols, l, m
         )
-        print(result[1])
         list_of_csr_tensors = result[0]
-
         torch.save({
             'row_ptr': list_of_csr_tensors[0],
             'col_indices': list_of_csr_tensors[1],
