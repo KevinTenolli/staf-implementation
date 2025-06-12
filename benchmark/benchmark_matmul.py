@@ -30,7 +30,8 @@ if __name__ == '__main__':
     print('before build of format')
     # Convert adjacency matrices in the format specified in '--operation'
     a = set_adjacency_matrix(
-        args.operation, dataset.edge_index, l=args.l, m=args.m)
+        args.operation, dataset.edge_index, l=args.l, m=args.m,
+        dataset=args.dataset)
 
     performance = []
     with inference_mode():

@@ -7,6 +7,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 class suffix_trie {
@@ -59,15 +60,6 @@ private:
       const trie_node *node, std::map<int, std::vector<int>> &patterns) const;
 
   /**
-   * @brief Search for a node in the trie that contains a specific row index.
-   *
-   * @param node Starting node for the search.
-   * @param row The row index to search for.
-   * @return Pointer to the node containing the row, or nullptr if not found.
-   */
-  trie_node *search_node_with_row(trie_node *node, int32_t row);
-
-  /**
    * @brief Recursively prints the trie nodes for visualization/debugging.
    *
    * @param node Pointer to the current node to print.
@@ -84,6 +76,8 @@ public:
    */
   suffix_trie();
 
+  std::unordered_map<int32_t, trie_node *> false_insert_map;
+  std::unordered_map<int32_t, trie_node *> true_insert_map;
   /**
    * @brief Extracts and returns shared patterns in the trie.
    *

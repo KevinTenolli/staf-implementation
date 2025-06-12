@@ -91,18 +91,6 @@ std::set<int> suffix_trie::build_patterns_bottom_up_unique(
   return current_rows;
 }
 
-trie_node *suffix_trie::search_node_with_row(trie_node *node, int32_t row) {
-  if (node->has_row_number(row)) {
-    return node;
-  }
-  for (const auto &child : node->get_children()) {
-    trie_node *result = search_node_with_row(child.get(), row);
-    if (result)
-      return result;
-  }
-  return nullptr;
-}
-
 void suffix_trie::print_node(const trie_node *node, const std::string &prefix,
                              bool is_last) const {
   std::cout << prefix << (is_last ? "└── " : "├── ");
@@ -145,16 +133,17 @@ int suffix_trie::false_insert(int col, const int32_t *rows, int size,
 
   for (int i = 0; i < size; i++) {
     int32_t row = rows[i];
-    trie_node *node = search_node_with_row(root.get(), row);
-
+    trie_node *node = true_insert_map[row];
     if (!node) {
       node = root.get();
       if (node->has_child(col)) {
         trie_node *child = node->get_child(col);
         child->add_row_number(row);
+        this->false_insert_map[row] = child;
         new_rows++;
       } else {
         trie_node *inserted_node = node->add_child(col, true);
+        this->false_insert_map[row] = inserted_node;
         inserted_node->add_row_number(row);
         new_nodes++;
         new_rows++;
@@ -162,9 +151,11 @@ int suffix_trie::false_insert(int col, const int32_t *rows, int size,
     } else {
       if (node->has_child(col)) {
         trie_node *child = node->get_child(col);
+        this->false_insert_map[row] = child;
         child->add_row_number(row);
       } else {
         trie_node *inserted_node = node->add_child(col, true);
+        this->false_insert_map[row] = inserted_node;
         inserted_node->add_row_number(row);
         new_nodes++;
       }
@@ -174,9 +165,38 @@ int suffix_trie::false_insert(int col, const int32_t *rows, int size,
   return new_nodes * score_lambda + new_rows;
 }
 
-void suffix_trie::true_insert() { true_insert_node(root.get()); }
+void suffix_trie::true_insert() {
+  for (auto &[row, node] : false_insert_map) {
+    // Promote the node to true
+    node->true_insert();
+    true_insert_map[row] = node;
 
-void suffix_trie::delete_false_nodes() { delete_false_node(root.get()); }
+    // Remove this row from the parent
+    trie_node *parent = node->get_parent();
+    if (parent) {
+      parent->remove_row(row);
+    }
+    true_insert_map[row] = node;
+  }
+  this->false_insert_map.clear();
+}
+
+void suffix_trie::delete_false_nodes() {
+  std::set<trie_node *> parents_to_clean;
+
+  for (auto &[row, false_node] : false_insert_map) {
+    trie_node *parent = false_node->get_parent();
+    if (parent) {
+      parents_to_clean.insert(parent);
+    }
+  }
+
+  for (auto parent : parents_to_clean) {
+    parent->remove_child_if_false_inserted();
+  }
+
+  false_insert_map.clear();
+}
 
 bool suffix_trie::is_empty() { return root->is_empty(); }
 

@@ -1,5 +1,6 @@
 #include "binary_csr.hpp"
 #include <iostream>
+#include <tuple>
 #include <vector>
 
 binary_csr::binary_csr(
@@ -22,16 +23,19 @@ binary_csr::binary_csr(
     }
   }
 
-  // Process shared patterns (appended after unique rows)
+  suffix_row_ptr.push_back(0);
+  map_suffix_ptr.push_back(0);
   for (const auto &pair : shared_patterns) {
     const std::vector<int> &pattern_cols = pair.second;
 
-    col_indices.insert(col_indices.end(), pattern_cols.begin(),
-                       pattern_cols.end());
-    data.insert(data.end(), pattern_cols.size(), 1.0f);
-    row_ptr.push_back(row_ptr.back() + pattern_cols.size());
+    suffix_col_indices.insert(suffix_col_indices.end(), pattern_cols.begin(),
+                              pattern_cols.end());
+    suffix_data.insert(suffix_data.end(), pattern_cols.size(), 1.0f);
+    suffix_row_ptr.push_back(suffix_row_ptr.back() + pattern_cols.size());
     std::vector rows_to_map = pair.first;
-    mapped_rows.emplace_back(rows_to_map);
+    map_row_index.insert(map_row_index.end(), rows_to_map.begin(),
+                         rows_to_map.end());
+    map_suffix_ptr.push_back(rows_to_map.size());
   }
 }
 
@@ -96,6 +100,21 @@ const std::vector<int> &binary_csr::get_col_indices() const {
 }
 
 const std::vector<float> &binary_csr::get_data() const { return data; }
-const std::vector<std::vector<int>> &binary_csr::get_mapped_rows() const {
-  return mapped_rows;
+
+const std::tuple<std::vector<int>, std::vector<int>>
+binary_csr::get_mapped_rows() const {
+  return std::make_tuple(map_suffix_ptr, map_row_index);
+}
+
+const std::vector<int> &binary_csr::get_suffix_row_ptr() const {
+  return suffix_row_ptr;
+};
+
+const std::vector<int> &binary_csr::get_suffix_col_indices() const {
+
+  return suffix_col_indices;
+};
+
+const std::vector<float> &binary_csr::get_suffix_data() const {
+  return suffix_data;
 };

@@ -15,10 +15,14 @@
  */
 class binary_csr {
 private:
-  std::vector<int> row_ptr;     ///< CSR row pointer array
-  std::vector<int> col_indices; ///< CSR column indices
-  std::vector<float> data; ///< CSR data values (always 1.0 for binary matrix)
-  std::vector<std::vector<int>> mapped_rows;
+  std::vector<int> row_ptr;
+  std::vector<int> col_indices;
+  std::vector<float> data;
+  std::vector<int> suffix_row_ptr;
+  std::vector<int> suffix_col_indices;
+  std::vector<float> suffix_data;
+  std::vector<int> map_suffix_ptr;
+  std::vector<int> map_row_index;
 
 public:
   /**
@@ -62,7 +66,25 @@ public:
    */
   const std::vector<float> &get_data() const;
 
-  const std::vector<std::vector<int>> &get_mapped_rows() const;
+  /**
+   * @brief Returns the row pointer array of the CSR matrix.
+   * @return const reference to the row_ptr vector.
+   */
+  const std::vector<int> &get_suffix_row_ptr() const;
+
+  /**
+   * @brief Returns the column indices of the CSR matrix.
+   * @return const reference to the col_indices vector.
+   */
+  const std::vector<int> &get_suffix_col_indices() const;
+
+  /**
+   * @brief Returns the data values of the CSR matrix.
+   * @return const reference to the data vector.
+   */
+  const std::vector<float> &get_suffix_data() const;
+
+  const std::tuple<std::vector<int>, std::vector<int>> get_mapped_rows() const;
 };
 
 #endif

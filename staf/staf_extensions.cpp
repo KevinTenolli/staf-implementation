@@ -10,7 +10,8 @@
               "\"" #x "\" is not a tensor of type \"" #dtype "\"")
 
 /*---------------------------Main function-----------------------------*/
-std::tuple<std::vector<torch::Tensor>, std::vector<std::vector<int>>>
+std::tuple<std::vector<torch::Tensor>, std::vector<torch::Tensor>,
+           std::vector<torch::Tensor>>
 init_staf_(const torch::Tensor &col_ptr, const torch::Tensor &row_idx,
            const torch::Tensor &values, const size_t n_rows,
            const size_t n_cols, const size_t score_lambda,
@@ -24,35 +25,25 @@ init_staf_(const torch::Tensor &col_ptr, const torch::Tensor &row_idx,
   int32_t *row_indices = row_idx.data_ptr<int32_t>();
   float *array_of_values = values.data_ptr<float>();
 
-  // Example static input
-  /* int32_t row_indices[] = { */
-  /*     0, 2, 3, 4, // col 0 */
-  /*     0, 2, 3, 4, // col 1 */
-  /*     1,          // col 2 */
-  /*     1, 4,       // col 3 */
-  /*     0, 2, 3, 4, // col 4 */
-  /*     0, 2, 3, 4  // col 5 */
-  /* }; */
-  /* int32_t col_pointers[] = {0, 4, 8, 9, 11, 15, 19}; */
-  /* int32_t col_size = 6; */
-
   suffix_forest forest(nr_tries, score_lambda);
   forest.create_forest(col_pointers, row_indices, n_cols);
-  forest.print_forest();
   auto binary_csr = forest.build_csr(n_rows);
 
-  std::vector<torch::Tensor> csr_tensors;
+  std::vector<torch::Tensor> csr_tensors = {
+      torch::tensor(binary_csr.get_row_ptr(), torch::kInt32),
+      torch::tensor(binary_csr.get_col_indices(), torch::kInt32),
+      torch::tensor(binary_csr.get_data(), torch::kFloat32)};
 
-  auto row_ptr_vec = binary_csr.get_row_ptr();
-  csr_tensors.push_back(torch::tensor(row_ptr_vec, torch::kInt32));
+  std::vector<torch::Tensor> map_tensors = {
+      torch::tensor(std::get<0>(binary_csr.get_mapped_rows()), torch::kInt32),
+      torch::tensor(std::get<1>(binary_csr.get_mapped_rows()), torch::kInt32)};
 
-  auto col_indices_vec = binary_csr.get_col_indices();
-  csr_tensors.push_back(torch::tensor(col_indices_vec, torch::kInt32));
+  std::vector<torch::Tensor> packed_suffix_data = {
+      torch::tensor(binary_csr.get_suffix_row_ptr(), torch::kInt32),
+      torch::tensor(binary_csr.get_suffix_col_indices(), torch::kInt32),
+      torch::tensor(binary_csr.get_suffix_data(), torch::kFloat32)};
 
-  auto data_vec = binary_csr.get_data();
-  csr_tensors.push_back(torch::tensor(data_vec, torch::kFloat32));
-
-  return std::make_tuple(csr_tensors, binary_csr.get_mapped_rows());
+  return std::make_tuple(csr_tensors, packed_suffix_data, map_tensors);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) { m.def("init_staf", &init_staf_); }

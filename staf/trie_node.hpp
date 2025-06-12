@@ -124,9 +124,11 @@ public:
    * @brief Marks the node as a "true" insertion, finalizing its state.
    */
   void true_insert();
+  trie_node *get_parent() const;
 
 private:
   int index; ///< Column number this node represents
+  trie_node *parent = nullptr;
   std::vector<std::unique_ptr<trie_node>> children; ///< Children nodes
   std::set<int> row_numbers;                        ///< Row indices (leaf data)
   bool false_insert; ///< Flag indicating if the node was a false insertion
