@@ -90,5 +90,7 @@ def load_dataset(name):
         return load_dimacs("coPapersDBLP")
     elif name == "COLLAB":
         return load_tudataset("COLLAB")
+    elif name == 'web-NotreDame':
+        return load_snap('web-NotreDame')
     else:
         raise NotImplementedError(f"Dataset {name} is not valid")
