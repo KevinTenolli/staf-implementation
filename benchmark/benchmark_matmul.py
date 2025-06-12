@@ -22,6 +22,9 @@ if __name__ == '__main__':
         "--m", type=int, default=10, help="Overwrites default number of tries")
     parser.add_argument("--warmup", type=int, default=10,
                         help="Number of warmup iterations.")
+    parser.add_argument("--skip", type=bool, default=False,
+                        help="Skip the format build and load the data from the previous runs based on configuration")
+
     args = parser.parse_args()
 
     # Load dataset
@@ -31,7 +34,7 @@ if __name__ == '__main__':
     # Convert adjacency matrices in the format specified in '--operation'
     a = set_adjacency_matrix(
         args.operation, dataset.edge_index, l=args.l, m=args.m,
-        dataset=args.dataset)
+        dataset=args.dataset, skip=args.skip)
 
     performance = []
     with inference_mode():
