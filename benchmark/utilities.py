@@ -11,9 +11,9 @@ from torch_geometric.datasets import TUDataset, SuiteSparseMatrixCollection, Pla
 ############################################################
 
 
-def set_adjacency_matrix(format, edge_index, l, m):
+def set_adjacency_matrix(format, edge_index, l, m, dataset):
     if format == "staf":
-        return staf(edge_index.to(int32), ones(edge_index.size(1), dtype=float32), l, m)
+        return staf(edge_index.to(int32), ones(edge_index.size(1), dtype=float32), l, m, dataset)
     else:
         raise NotImplementedError(f"Format {format} is not valid")
 
